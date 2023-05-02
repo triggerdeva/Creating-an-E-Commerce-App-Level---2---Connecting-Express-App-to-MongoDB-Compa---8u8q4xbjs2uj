@@ -1,164 +1,177 @@
-const User = require("../models/User");
+/* Product Controllers */
 
-// Fetches all Users data [Paginated]
-const getAllUsers = async (req, res) => {
-  try {
-    const { page = 1, limit = 5 } = req.query;
+const Product = require('../models/Product');
 
-    const users = await User.find()
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const count = await User.countDocuments(User.find());
-    res.status(200).json({
-      status: "success",
-      data: {
-        count,
-        users,
-      },
-    });
-  } catch (err) {
-    res.status(404).json({
-      message: "Users Not Found",
-      status: "Error",
-      error: err,
-    });
-  }
+const searchProducts = async (req, res) => {
+    try {
+        const { page = 1, limit = 10, search, category, sort, minPrice, maxPrice } = req.query;
+        const query = {};
+        if (search) {
+            query.name = { $regex: search, $options: "i" };
+        }
+        if (category) {
+            query.category = category;
+        }
+        if (minPrice && maxPrice) {
+            query.price = { $gte: minPrice, $lte: maxPrice };
+        } else if (minPrice) {
+            query.price = { $gte: minPrice };
+        } else if (maxPrice) {
+            query.price = { $lte: maxPrice };
+        }
+        const sortOrder = sort === "asc" ? "price" : "-price";
+        const products = await Product.find(query)
+            .limit(limit * 1)
+            .skip((page - 1) * limit)
+            .sort(sortOrder);
+        const count = await Product.countDocuments(query);
+        res.status(200).json({
+            status: "success",
+            data: {
+                count,
+                products,
+            },
+        });
+    } catch (err) {
+        res.status(404).json({
+            message: "Products Not Found",
+            status: "Error",
+            error: err,
+        });
+    }
 };
 
-// Fetches the user details with the given ID.
-const getUserByID = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({
-        status: "Error",
-        message: "User Not Found",
-      });
+
+// Fetches the product with the given ID
+const getProductByID = async (req, res) => {
+    try {
+        const product = await Product.findById(req.params.id);
+        if (!product) {
+            return res.status(404).json({
+                status: "Error",
+                message: "Product Not Found",
+            });
+        }
+        res.status(200).json({
+            status: "success",
+            data: {
+                product,
+            },
+        });
+    } catch (err) {
+        res.status(400).json({
+            message: "Product Fetching Failed",
+            status: "Error",
+            error: err,
+        });
     }
-    return res.status(200).json({
-      status: "success",
-      data: {
-        user: user,
-      },
-    });
-  } catch (err) {
-    res.status(400).json({
-      message: "User Fetching Failed",
-      status: "Error",
-      error: err,
-    });
-  }
 };
 
-// Creates a new User
-const createUser = async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
+// Creates a new product
+const createProduct = async (req, res) => {
+    try {
+        const { name, description, price, category } = req.body;
 
-    if (!username) {
-      return res.status(400).json({
-        message: "Username Missing",
-        status: "Error",
-      });
-    }
-    if (!email) {
-      return res.status(400).json({
-        message: "Email Missing",
-        status: "Error",
-      });
-    }
-    if (!password) {
-      return res.status(400).json({
-        message: "Password Missing",
-        status: "Error",
-      });
-    }
+        if (!name) {
+            return res.status(400).json({
+                message: "Name Missing",
+                status: "Error",
+            });
+        }
+        if (!description) {
+            return res.status(400).json({
+                message: "Description Missing",
+                status: "Error",
+            });
+        }
+        if (!price) {
+            return res.status(400).json({
+                message: "Price Missing",
+                status: "Error",
+            });
+        }
+        if (!category) {
+            return res.status(400).json({
+                message: "Category Missing",
+                status: "Error",
+            });
+        }
 
-    const newUser = await User.create({
-      username,
-      email,
-      password,
-    });
+        const new_product = new Product({ name, description, price, category });
+        await new_product.save();
 
-    res.status(201).json({
-      status: "success",
-      message: "User Created Successfully",
-      data: {
-        user: newUser,
-      },
-    });
-  } catch (err) {
-    res.status(400).json({
-      message: "User Creation failed",
-      status: "Error",
-      error: err,
-    });
-  }
+        res.status(201).json({
+            status: "success",
+            data: {
+                product: new_product,
+            },
+        });
+    } catch (err) {
+        res.status(400).json({
+            message: "Product Creation Failed",
+            status: "Error",
+            error: err,
+        });
+    }
 };
 
-// Updates user's details
-const updateUser = async (req, res) => {
-  try {
-    const { updatedData } = req.body;
+// Updates product details with the given ID
+const updateProduct = async (req, res) => {
+    try {
+        const { updatedData } = req.body;
 
-    const user = await User.findByIdAndUpdate(req.params.id, {
-      $set: updatedData,
-    });
+        const product = await Product.findByIdAndUpdate(
+            req.params.id,
+            { $set: updatedData }
+        );
 
-    if (!user) {
-      return res.status(404).json({
-        message: "User Not Found",
-        status: "Error",
-      });
+        if (!product) {
+            return res.status(404).json({
+                message: "Product Not Found",
+                status: "Error",
+            });
+        }
+        // console.log(product);
+
+        const updatedProduct = await Product.findById(req.params.id);
+        res.status(200).json({
+            status: "success",
+            message: "Product Updated Successfully",
+            data: {
+                updatedProduct,
+            },
+        });
+    } catch (err) {
+        // console.log(err);
+        res.status(400).json({
+            message: "Product Updation Failed",
+            status: "Error",
+            error: err,
+        });
     }
-
-    const updatedUser = await User.findById(req.params.id);
-    res.status(200).json({
-      status: "success",
-      message: "User Updated Successfully",
-      data: {
-        updatedUser,
-      },
-    });
-  } catch (err) {
-    res.status(400).json({
-      message: "User Updation Failed",
-      status: "Error",
-      error: err,
-    });
-  }
 };
 
-// Deletes the user with the given ID.
-const deleteUser = async (req, res) => {
-  try {
-    const deletedUser = await User.findByIdAndDelete(req.params.id);
-    if (!deletedUser) {
-      return res
-        .status(404)
-        .json({ status: "Error", message: "User not Found" });
+// Deletes the product with the given ID.
+const deleteProduct = async (req, res) => {
+    try {
+        const product = await Product.findByIdAndDelete(req.params.id);
+        if (!product) {
+            return res.status(404).json({
+                status: "Error",
+                message: "Product Not Found",
+            });
+        }
+        res.status(200).json({
+            status: "success",
+            data: null,
+            message: `Product {product._id} deleted successfully`,
+        });
+    } catch (err) {
+        res.status(400).json({
+            status: "Error",
+            message: err.message,
+        });
     }
-    res.status(201).json({
-      status: "success",
-      message: "User Deleted Successfully",
-      data: {
-        user: deletedUser,
-      },
-    });
-  } catch (err) {
-    res.status(400).json({
-      message: "User Deletion Failed",
-      status: "Error",
-      error: err,
-    });
-  }
 };
 
-module.exports = {
-  getAllUsers,
-  getUserByID,
-  createUser,
-  updateUser,
-  deleteUser,
-};
+module.exports = { searchProducts, getProductByID, createProduct, updateProduct, deleteProduct };
